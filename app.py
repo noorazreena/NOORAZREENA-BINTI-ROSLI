@@ -14,7 +14,9 @@ if not api_key:
 
 if api_key:
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    
+    # KITA TUKAR NAMA MODEL KAT SINI JADI 'gemini-pro'
+    model = genai.GenerativeModel("gemini-pro")
     
     st.write("---")
     st.write("### Masukkan Data Roster:")
