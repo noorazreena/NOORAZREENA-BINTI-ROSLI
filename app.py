@@ -1,36 +1,53 @@
 import streamlit as st
 import google.generativeai as genai
 
-st.set_page_config(page_title="AI Doctor", page_icon="🩺")
-st.title("🩺 AI Connection Test")
+# 1. SETUP PAGE
+st.set_page_config(page_title="Roster AI 2.0", page_icon="📅")
+st.title("📅 Sistem Roster AI (Versi 2.0)")
 
-# 1. Check API Key
+# 2. API SETUP
 api_key = st.secrets.get("GOOGLE_API_KEY")
-st.write(f"🔑 Status API Key: {'Ada ✅' if api_key else 'Tiada ❌'}")
+
+if not api_key:
+    api_key = st.text_input("Masukkan Google API Key:", type="password")
 
 if api_key:
     try:
         genai.configure(api_key=api_key)
         
-        st.write("---")
-        st.write("⏳ Sedang menghubungi Google server...")
+        # KITA GUNA MODEL YANG SAH DARI LIST KAU TADI
+        model = genai.GenerativeModel("gemini-2.0-flash")
         
-        # 2. Minta senarai model yang sah
-        models_list = []
-        for m in genai.list_models():
-            if 'generateContent' in m.supported_generation_methods:
-                models_list.append(m.name)
+        st.info("✅ Menggunakan Model: Gemini 2.0 Flash (Terkini)")
         
-        if models_list:
-            st.success(f"Berjaya! Akaun anda support {len(models_list)} model:")
-            for model in models_list:
-                st.code(model) # Tunjuk nama model yang sah
-        else:
-            st.error("Server Google jawab OK, tapi tiada model dijumpai. Akaun mungkin baru sangat atau ada sekatan region.")
-            
+        # 3. INPUT USER
+        st.write("### 📝 Masukkan Data Roster:")
+        st.write("Contoh input: _'Plan: Ali(P), Abu(M). Actual: Ali(MC). Siapa patut ganti?'_")
+        
+        user_input = st.text_area("Data Roster / Isu:", height=150)
+        
+        # 4. BUTANG PROSES
+        if st.button("🚀 Analisa Roster"):
+            if user_input:
+                with st.spinner("AI sedang berfikir..."):
+                    # Prompt khas untuk HR/Roster
+                    prompt = f"""
+                    Anda adalah pakar HR dan Roster Manager.
+                    Sila analisa situasi ini dan berikan:
+                    1. Rumusan Masalah
+                    2. Cadangan Penyelesaian (Siapa ganti/Apa perlu buat)
+                    3. Jadual ringkas (jika perlu)
+                    
+                    Data: {user_input}
+                    """
+                    
+                    response = model.generate_content(prompt)
+                    st.success("Siap!")
+                    st.markdown(response.text)
+            else:
+                st.warning("Sila tulis sesuatu dulu.")
+                
     except Exception as e:
-        st.error("🔥 GAGAL MENGHUBUNGI SERVER:")
-        st.error(f"Error Message: {e}")
-        st.info("Tips: Check balik API Key. Pastikan tiada 'space' di hujung.")
+        st.error(f"Masalah Teknikal: {e}")
 else:
-    st.warning("Sila masukkan API Key dalam Secrets.")
+    st.warning("Sila masukkan API Key dalam 'Secrets' untuk mula.")
