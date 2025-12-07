@@ -14,40 +14,51 @@ if not api_key:
 if api_key:
     try:
         genai.configure(api_key=api_key)
-        
-        # KITA GUNA MODEL YANG SAH DARI LIST KAU TADI
         model = genai.GenerativeModel("gemini-2.0-flash")
         
-        st.info("✅ Menggunakan Model: Gemini 2.0 Flash (Terkini)")
-        
         # 3. INPUT USER
-        st.write("### 📝 Masukkan Data Roster:")
-        st.write("Contoh input: _'Plan: Ali(P), Abu(M). Actual: Ali(MC). Siapa patut ganti?'_")
+        st.info("✅ Model: Gemini 2.0 Flash (Ready)")
+        st.write("### 📝 Masukkan Isu Roster:")
         
-        user_input = st.text_area("Data Roster / Isu:", height=150)
+        user_input = st.text_area("Contoh: 'Ali MC hari ni. Siapa free ganti shift Pagi?'", height=150)
         
         # 4. BUTANG PROSES
         if st.button("🚀 Analisa Roster"):
             if user_input:
-                with st.spinner("AI sedang berfikir..."):
-                    # Prompt khas untuk HR/Roster
-                    prompt = f"""
-                    Anda adalah pakar HR dan Roster Manager.
-                    Sila analisa situasi ini dan berikan:
-                    1. Rumusan Masalah
-                    2. Cadangan Penyelesaian (Siapa ganti/Apa perlu buat)
-                    3. Jadual ringkas (jika perlu)
+                with st.spinner("Sedang merangka penyelesaian..."):
                     
-                    Data: {user_input}
+                    # Prompt khas untuk output ringkas & padat (sesuai WhatsApp)
+                    prompt = f"""
+                    Anda adalah Roster Manager. Sila analisa: "{user_input}"
+                    
+                    Berikan jawapan dalam format yang sesuai untuk di-copy ke WhatsApp Group.
+                    Struktur jawapan:
+                    1. 🚨 ISU (Ringkas)
+                    2. ✅ CADANGAN SOLUSI (Point form)
+                    3. 📅 JADUAL BARU (Jika perlu)
+                    
+                    Pastikan nada profesional tapi tegas.
                     """
                     
                     response = model.generate_content(prompt)
-                    st.success("Siap!")
+                    
+                    # BAHAGIAN 1: Paparan Cantik (Web)
+                    st.success("Analisa Siap!")
+                    st.markdown("### 🔍 Hasil Analisa:")
                     st.markdown(response.text)
+                    
+                    # BAHAGIAN 2: Kotak Copy (WhatsApp)
+                    st.write("---")
+                    st.subheader("📋 Salin untuk WhatsApp:")
+                    st.caption("Tekan ikon 'Copy' kecil di bucu kanan atas kotak kelabu ni 👇")
+                    
+                    # Kita letak dalam st.code supaya automatik ada butang Copy
+                    st.code(response.text, language=None)
+                    
             else:
-                st.warning("Sila tulis sesuatu dulu.")
+                st.warning("Sila tulis isu roster dulu.")
                 
     except Exception as e:
-        st.error(f"Masalah Teknikal: {e}")
+        st.error(f"Error: {e}")
 else:
-    st.warning("Sila masukkan API Key dalam 'Secrets' untuk mula.")
+    st.warning("Sila masukkan API Key dulu.")
