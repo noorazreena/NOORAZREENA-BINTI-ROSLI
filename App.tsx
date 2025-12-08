@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { RosterTable } from './components/RosterTable'; 
 import { DailyRoster } from './components/DailyRoster'; 
-import { ChangeShiftModal } from './components/ChangeShiftModal'; // Import Modal
+import { ChangeShiftModal } from './components/ChangeShiftModal'; 
 import { StaffRoster, DailyDutyDetails, Staff, ShiftCode, Rank } from './types'; 
 import { Calendar, Layout, FileText, Activity } from 'lucide-react';
 
-// --- DATA SAMPLE ---
+// --- SENARAI 8 STAFF LENGKAP ---
 const SAMPLE_STAFF: Staff[] = [
   { id: '1', bodyNumber: '74722', rank: Rank.SJN, name: 'MOHD KHAIRUL AZWANDY', walkieTalkie: 'N01', vehicle: 'WXC 1234' },
   { id: '2', bodyNumber: '94340', rank: Rank.KPL, name: 'KALAIARASU A/L MUNIANDY', walkieTalkie: 'N02', vehicle: 'WXC 2345' },
@@ -13,6 +13,8 @@ const SAMPLE_STAFF: Staff[] = [
   { id: '4', bodyNumber: '67890', rank: Rank.KONST, name: 'AHMAD ZAKI', walkieTalkie: 'N04', vehicle: 'MPV 2' },
   { id: '5', bodyNumber: '11111', rank: Rank.KONST, name: 'SITI AMINAH', walkieTalkie: 'N05', vehicle: 'MPV 3' },
   { id: '6', bodyNumber: '22222', rank: Rank.KONST, name: 'RAHMAT BIN SAID', walkieTalkie: 'N06', vehicle: 'WXC 8888' },
+  { id: '7', bodyNumber: '33333', rank: Rank.KONST, name: 'NOORAZREENA BINTI ROSLI', walkieTalkie: 'N07', vehicle: 'WXC 9999' },
+  { id: '8', bodyNumber: '44444', rank: Rank.KONST, name: 'MUHAMMAD HAFIZ', walkieTalkie: 'N08', vehicle: 'MPV 4' },
 ];
 
 const generateSampleRoster = (): StaffRoster[] => {
@@ -20,12 +22,13 @@ const generateSampleRoster = (): StaffRoster[] => {
     const days = [];
     for (let i = 1; i <= 31; i++) {
       let code = ShiftCode.S;
-      if (i % 4 === 0) code = ShiftCode.O;
-      else if (i % 4 === 3) code = ShiftCode.M;
+      // Logic simple: 4 hari kerja, 2 hari cuti
+      if (i % 6 === 0 || i % 6 === 5) code = ShiftCode.O;
+      else if (i % 6 === 3 || i % 6 === 4) code = ShiftCode.M;
       
       days.push({
         date: i,
-        month: 11, 
+        month: 11, // Disember (Indeks 11)
         year: 2025,
         dayOfWeek: new Date(2025, 11, i).getDay(),
         code: code,
@@ -44,45 +47,41 @@ const generateSampleRoster = (): StaffRoster[] => {
   });
 };
 
-const SAMPLE_ROSTER_DATA = generateSampleRoster();
-
 const SAMPLE_STRENGTH = Array.from({ length: 31 }, (_, i) => ({
   date: `2025-12-${i + 1}`,
   shiftSiang: 4,
   shiftMalam: 3,
-  off: 2
+  off: 1
 }));
 
 export default function App() {
   const [viewMode, setViewMode] = useState<'PLAN' | 'ACTUAL' | 'DAILY'>('PLAN');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date(2025, 11, 1)); 
-  const [rosterData, setRosterData] = useState<StaffRoster[]>(SAMPLE_ROSTER_DATA);
+  const [rosterData, setRosterData] = useState<StaffRoster[]>(generateSampleRoster()); // Guna function terus
   const [dailyDetails, setDailyDetails] = useState<DailyDutyDetails | null>(null);
 
   // STATE UNTUK MODAL
   const [isChangeShiftModalOpen, setIsChangeShiftModalOpen] = useState(false);
   const [selectedCell, setSelectedCell] = useState<{staffId: string, date: string} | null>(null);
 
-  // FUNCTION HANDLE CLICK JADUAL
+  // FUNCTION BILA TEKAN KOTAK (JADUAL)
   const handleCellClick = (staffId: string, dayDate: number, currentCode: ShiftCode) => {
-    // Convert day number to date string "YYYY-MM-DD"
+    console.log("Cell clicked:", staffId, dayDate); // Debugging
     const dateStr = `2025-12-${dayDate.toString().padStart(2, '0')}`;
     setSelectedCell({ staffId, date: dateStr });
     setIsChangeShiftModalOpen(true);
   };
 
-  // FUNCTION UPDATE SHIFT SEBENAR
+  // FUNCTION UPDATE SHIFT
   const handleShiftChange = (staffId: string, dateStr: string, newCode: ShiftCode) => {
-    // Cari hari berdasarkan dateStr (YYYY-MM-DD)
     const dayNum = parseInt(dateStr.split('-')[2]);
 
     const updatedRoster = rosterData.map(person => {
         if (person.staff.id !== staffId) return person;
 
-        // Update code untuk hari tersebut
         const newDays = person.days.map(d => {
             if (d.date === dayNum) {
-                return { ...d, code: newCode };
+                return { ...d, code: newCode, originalCode: newCode }; // Update code
             }
             return d;
         });
@@ -109,7 +108,7 @@ export default function App() {
               rosterData={rosterData}
               dailyStrength={SAMPLE_STRENGTH}
               viewMode="PLAN"
-              onCellClick={handleCellClick} // Pass function ni
+              onCellClick={handleCellClick} 
             />
           </div>
         );
@@ -127,7 +126,7 @@ export default function App() {
               rosterData={rosterData}
               dailyStrength={SAMPLE_STRENGTH}
               viewMode="ACTUAL"
-              onCellClick={handleCellClick} // Pass function ni
+              onCellClick={handleCellClick}
             />
           </div>
         );
@@ -192,7 +191,6 @@ export default function App() {
                     onSubmit={handleShiftChange}
                     staffList={SAMPLE_STAFF}
                 />
-                {/* Kita inject nilai default ke dalam modal secara manual jika perlu, tapi buat masa ni biarkan user pilih balik staff/date utk confirm */}
             </div>
         </div>
       )}
