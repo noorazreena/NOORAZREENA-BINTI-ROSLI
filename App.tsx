@@ -1,4 +1,4 @@
-// (SILA PADAM DAN GANTI SEMUA KOD DALAM App.tsx)
+// (SILA PADAM SEMUA KOD LAMA DALAM App.tsx DAN GANTI DENGAN KOD INI)
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Printer, Calendar, UserMinus, Clock, Ban, ArrowRightCircle, FileText, LayoutGrid, CheckCircle, ChevronLeft, ChevronRight, Download, BarChart2, Trash2, RefreshCcw, Edit3, Lock, Unlock, ShieldCheck, Users, CalendarDays } from 'lucide-react';
@@ -445,9 +445,7 @@ function App() {
              )}
              <button onClick={handlePrint} className="flex items-center space-x-2 bg-white text-gray-900 px-4 py-2 rounded shadow hover:bg-gray-100 transition-colors font-bold text-xs"><Printer className="w-4 h-4" /><span>PRINT</span></button>
           </div>
-        </div>
       </div>
-      )}
 
       {viewMode !== 'DAILY' ? (
         <>
@@ -479,6 +477,7 @@ function App() {
                   <div className="flex items-center"><span className={`w-6 h-6 border flex items-center justify-center mr-2 font-bold ${SHIFT_COLORS[ShiftCode.RDOT]}`}>RDOT</span> Rest Day OT (Request Only)</div>
                   <div className="flex items-center"><span className={`w-6 h-6 border flex items-center justify-center mr-2 font-bold ${SHIFT_COLORS[ShiftCode.PH]}`}>PH</span> Public Holiday</div>
                   <div className="flex items-center"><span className={`w-6 h-6 border flex items-center justify-center mr-2 font-bold ${SHIFT_COLORS[ShiftCode.CFPH]}`}>CFPH</span> Carry Forward PH</div>
+                  <div className="flex items-center"><span className={`w-6 h-6 border flex items-center justify-center mr-2 font-bold ${SHIFT_COLORS[ShiftCode.AL]}`}>AL</span> Annual Leave</div>
                   <div className="flex items-center"><span className="w-6 h-6 border border-gray-300 flex items-center justify-center mr-2 font-bold bg-white">4</span> Overtime Hours</div>
                 </div>
             </div>
