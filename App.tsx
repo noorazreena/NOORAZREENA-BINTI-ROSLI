@@ -1,30 +1,31 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { RosterTable } from './components/RosterTable'; 
 import { DailyRoster } from './components/DailyRoster'; 
+import { ChangeShiftModal } from './components/ChangeShiftModal'; // Import Modal
 import { StaffRoster, DailyDutyDetails, Staff, ShiftCode, Rank } from './types'; 
 import { Calendar, Layout, FileText, Activity } from 'lucide-react';
 
-// --- DATA SAMPLE (Supaya Jadual Tak Kosong) ---
+// --- DATA SAMPLE ---
 const SAMPLE_STAFF: Staff[] = [
   { id: '1', bodyNumber: '74722', rank: Rank.SJN, name: 'MOHD KHAIRUL AZWANDY', walkieTalkie: 'N01', vehicle: 'WXC 1234' },
   { id: '2', bodyNumber: '94340', rank: Rank.KPL, name: 'KALAIARASU A/L MUNIANDY', walkieTalkie: 'N02', vehicle: 'WXC 2345' },
   { id: '3', bodyNumber: '12345', rank: Rank.KONST, name: 'ALI BIN ABU', walkieTalkie: 'N03', vehicle: 'MPV 1' },
   { id: '4', bodyNumber: '67890', rank: Rank.KONST, name: 'AHMAD ZAKI', walkieTalkie: 'N04', vehicle: 'MPV 2' },
+  { id: '5', bodyNumber: '11111', rank: Rank.KONST, name: 'SITI AMINAH', walkieTalkie: 'N05', vehicle: 'MPV 3' },
+  { id: '6', bodyNumber: '22222', rank: Rank.KONST, name: 'RAHMAT BIN SAID', walkieTalkie: 'N06', vehicle: 'WXC 8888' },
 ];
 
-// Generate Data Shift untuk 30 Hari
 const generateSampleRoster = (): StaffRoster[] => {
   return SAMPLE_STAFF.map(staff => {
     const days = [];
     for (let i = 1; i <= 31; i++) {
-      // Logic simple: Gilir-gilir shift
       let code = ShiftCode.S;
       if (i % 4 === 0) code = ShiftCode.O;
       else if (i % 4 === 3) code = ShiftCode.M;
       
       days.push({
         date: i,
-        month: 11, // Disember (0-indexed 11 = Dec)
+        month: 11, 
         year: 2025,
         dayOfWeek: new Date(2025, 11, i).getDay(),
         code: code,
@@ -51,14 +52,47 @@ const SAMPLE_STRENGTH = Array.from({ length: 31 }, (_, i) => ({
   shiftMalam: 3,
   off: 2
 }));
-// -----------------------------------------------------
 
 export default function App() {
   const [viewMode, setViewMode] = useState<'PLAN' | 'ACTUAL' | 'DAILY'>('PLAN');
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date(2025, 11, 1)); // Default 1 Dec 2025
-  
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date(2025, 11, 1)); 
   const [rosterData, setRosterData] = useState<StaffRoster[]>(SAMPLE_ROSTER_DATA);
   const [dailyDetails, setDailyDetails] = useState<DailyDutyDetails | null>(null);
+
+  // STATE UNTUK MODAL
+  const [isChangeShiftModalOpen, setIsChangeShiftModalOpen] = useState(false);
+  const [selectedCell, setSelectedCell] = useState<{staffId: string, date: string} | null>(null);
+
+  // FUNCTION HANDLE CLICK JADUAL
+  const handleCellClick = (staffId: string, dayDate: number, currentCode: ShiftCode) => {
+    // Convert day number to date string "YYYY-MM-DD"
+    const dateStr = `2025-12-${dayDate.toString().padStart(2, '0')}`;
+    setSelectedCell({ staffId, date: dateStr });
+    setIsChangeShiftModalOpen(true);
+  };
+
+  // FUNCTION UPDATE SHIFT SEBENAR
+  const handleShiftChange = (staffId: string, dateStr: string, newCode: ShiftCode) => {
+    // Cari hari berdasarkan dateStr (YYYY-MM-DD)
+    const dayNum = parseInt(dateStr.split('-')[2]);
+
+    const updatedRoster = rosterData.map(person => {
+        if (person.staff.id !== staffId) return person;
+
+        // Update code untuk hari tersebut
+        const newDays = person.days.map(d => {
+            if (d.date === dayNum) {
+                return { ...d, code: newCode };
+            }
+            return d;
+        });
+
+        return { ...person, days: newDays };
+    });
+
+    setRosterData(updatedRoster);
+    setIsChangeShiftModalOpen(false);
+  };
 
   const renderContent = () => {
     switch (viewMode) {
@@ -69,12 +103,13 @@ export default function App() {
               <h2 className="font-bold text-blue-900 flex items-center gap-2 text-lg">
                 <Calendar className="w-5 h-5" /> MASTER ROSTER PLAN (DISEMBER 2025)
               </h2>
-              <p className="text-sm text-blue-700">Paparan perancangan jadual asal.</p>
+              <p className="text-sm text-blue-700">Klik pada kotak shift untuk ubah jadual.</p>
             </div>
             <RosterTable 
               rosterData={rosterData}
               dailyStrength={SAMPLE_STRENGTH}
-              viewMode="PLAN" 
+              viewMode="PLAN"
+              onCellClick={handleCellClick} // Pass function ni
             />
           </div>
         );
@@ -86,12 +121,13 @@ export default function App() {
               <h2 className="font-bold text-green-900 flex items-center gap-2 text-lg">
                 <Activity className="w-5 h-5" /> MASTER ACTUAL (REKOD SEBENAR)
               </h2>
-              <p className="text-sm text-green-700">Paparan kehadiran sebenar, OT, dan perubahan shift.</p>
+              <p className="text-sm text-green-700">Klik untuk update kehadiran sebenar / OT.</p>
             </div>
             <RosterTable 
               rosterData={rosterData}
               dailyStrength={SAMPLE_STRENGTH}
-              viewMode="ACTUAL" 
+              viewMode="ACTUAL"
+              onCellClick={handleCellClick} // Pass function ni
             />
           </div>
         );
@@ -115,7 +151,6 @@ export default function App() {
                 />
               </div>
             </div>
-            
             <DailyRoster 
               date={selectedDate}
               rosterData={rosterData}
@@ -130,42 +165,37 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-100 font-sans text-gray-900 flex flex-col">
-      {/* HEADER / NAVIGATION BAR */}
       <div className="bg-white shadow-md p-4 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
             <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
                 📅 SISTEM PENGURUSAN ROSTER
             </h1>
-            
             <div className="flex rounded-lg shadow-sm bg-gray-100 p-1 overflow-hidden border border-gray-200">
-            <button 
-                onClick={() => setViewMode('PLAN')}
-                className={`px-4 py-2 text-sm font-bold flex items-center gap-2 rounded-md transition-all ${viewMode === 'PLAN' ? 'bg-blue-600 text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}
-            >
-                <Calendar className="w-4 h-4" /> MASTER PLAN
-            </button>
-            
-            <button 
-                onClick={() => setViewMode('ACTUAL')}
-                className={`px-4 py-2 text-sm font-bold flex items-center gap-2 rounded-md transition-all ${viewMode === 'ACTUAL' ? 'bg-green-600 text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}
-            >
-                <Activity className="w-4 h-4" /> MASTER ACTUAL
-            </button>
-            
-            <button 
-                onClick={() => setViewMode('DAILY')}
-                className={`px-4 py-2 text-sm font-bold flex items-center gap-2 rounded-md transition-all ${viewMode === 'DAILY' ? 'bg-purple-600 text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}
-            >
-                <FileText className="w-4 h-4" /> DAILY ROSTER
-            </button>
+            <button onClick={() => setViewMode('PLAN')} className={`px-4 py-2 text-sm font-bold flex items-center gap-2 rounded-md transition-all ${viewMode === 'PLAN' ? 'bg-blue-600 text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}><Calendar className="w-4 h-4" /> PLAN</button>
+            <button onClick={() => setViewMode('ACTUAL')} className={`px-4 py-2 text-sm font-bold flex items-center gap-2 rounded-md transition-all ${viewMode === 'ACTUAL' ? 'bg-green-600 text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}><Activity className="w-4 h-4" /> ACTUAL</button>
+            <button onClick={() => setViewMode('DAILY')} className={`px-4 py-2 text-sm font-bold flex items-center gap-2 rounded-md transition-all ${viewMode === 'DAILY' ? 'bg-purple-600 text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}><FileText className="w-4 h-4" /> DAILY</button>
             </div>
         </div>
       </div>
 
-      {/* RUANG UTAMA */}
       <div className="flex-1 overflow-auto">
          {renderContent()}
       </div>
+
+      {/* MODAL CHANGE SHIFT */}
+      {isChangeShiftModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+                <ChangeShiftModal 
+                    isOpen={isChangeShiftModalOpen}
+                    onClose={() => setIsChangeShiftModalOpen(false)}
+                    onSubmit={handleShiftChange}
+                    staffList={SAMPLE_STAFF}
+                />
+                {/* Kita inject nilai default ke dalam modal secara manual jika perlu, tapi buat masa ni biarkan user pilih balik staff/date utk confirm */}
+            </div>
+        </div>
+      )}
     </div>
   );
 }
