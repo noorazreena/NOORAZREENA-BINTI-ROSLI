@@ -4,12 +4,10 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Printer, Calendar, UserMinus, Clock, Ban, ArrowRightCircle, FileText, LayoutGrid, CheckCircle, ChevronLeft, ChevronRight, Download, BarChart2, Trash2, RefreshCcw, Edit3, Lock, Unlock, ShieldCheck, Users, CalendarDays } from 'lucide-react';
 import { RosterTable } from './components/RosterTable';
 import { DailyRoster } from './components/DailyRoster';
-
 // PATH BETUL: Import dari services/rosterGenerator.ts
 import { generateRoster, calculateDailyStrength } from './services/rosterGenerator'; 
-
 import { MONTH_NAMES, SHIFT_COLORS, STAFF_LIST as DEFAULT_STAFF_LIST } from './constants';
-import { ShiftCode, RosterOverride, DailyDutyDetails, ApprovalRecord, Staff, Rank } from './types'; // Import Rank juga
+import { ShiftCode, RosterOverride, DailyDutyDetails, ApprovalRecord, Staff, Rank } from './types'; 
 import { LeaveRequestModal } from './components/LeaveRequestModal';
 import { RequestRDOTModal } from './components/RequestRDOTModal';
 import { RequestNoOTModal } from './components/RequestNoOTModal';
@@ -25,10 +23,7 @@ import { PublicHolidaysModal } from './components/PublicHolidaysModal';
 
 function App() {
   const today = new Date();
-  
-  // FIX: Staff List data initial dari constants.ts
-  // Kita guna STAFF_LIST dari constants.ts (yang ada 8 staff penuh)
-  
+
   // --- PERSISTENT UI STATE ---
   const [currentYear, setCurrentYear] = useState(() => {
     try {
@@ -495,4 +490,45 @@ function App() {
                   <li>KPL & Others: Rotate Weekly (6 S / 1 O / 6 M / 1 O).</li>
                   <li><b>Rotation Shift:</b> Off Day moves to next day every 3 months (except SJN/Noorazreena).</li>
                   <li>Senior Rank (SJN/KPL) required per day.</li>
-                  <li>
+                  <li>RDOT assigned <b>only on request</b>.</li>
+                  <li>No OT = No Meal Allowance (&lt;10 hours duty).</li>
+                </ul>
+            </div>
+          </div>
+        </>
+      ) : (
+        <DailyRoster 
+          date={selectedDailyDate} 
+          rosterData={rosterData} 
+          details={currentDailyDetails} 
+          onDetailsUpdate={handleDailyDetailsUpdate}
+          staffList={staffList} 
+        />
+      )}
+
+      {/* FOOTER CONTROLS */}
+      <div className="no-print mt-12 border-t border-gray-300 pt-6 text-center">
+        <button 
+          onClick={handleFactoryReset}
+          className="text-red-600 hover:text-red-800 text-xs flex items-center justify-center gap-2 mx-auto"
+        >
+          <Trash2 className="w-3 h-3" /> Reset App Data
+        </button>
+        <p className="text-gray-400 text-[10px] mt-2">
+          This app uses local storage. Data is saved to this browser only.
+        </p>
+      </div>
+
+      <LeaveRequestModal isOpen={isLeaveModalOpen} onClose={() => setIsLeaveModalOpen(false)} onSubmit={handleLeaveSubmit} staffList={staffList} />
+      <RequestRDOTModal isOpen={isRDOTModalOpen} onClose={() => setIsRDOTModalOpen(false)} staffList={staffList} />
+      <RequestNoOTModal isOpen={isNoOTModalOpen} onClose={() => setIsNoOTModalOpen(false)} onSubmit={handleNoOTSubmit} staffList={staffList} />
+      <RequestCFPHModal isOpen={isCFPHModalOpen} onClose={() => setIsCFPHModalOpen(false)} onSubmit={handleCFPHSubmit} staffList={staffList} />
+      <SwapShiftModal isOpen={isSwapModalOpen} onClose={() => setIsSwapModalOpen(false)} onSubmit={handleSwapSubmit} staffList={staffList} />
+      <ChangeShiftModal isOpen={isChangeShiftModalOpen} onClose={() => setIsChangeShiftModalOpen(false)} onSubmit={handleChangeShiftSubmit} staffList={staffList} />
+      <StatsModal isOpen={isStatsModalOpen} onClose={() => setIsStatsModalOpen(false)} rosterData={rosterData} />
+      <ApprovalModal isOpen={isApprovalModalOpen} onClose={() => setIsApprovalModalOpen(false)} onSubmit={handleApproveMaster} title="Approve Master Roster" />
+      <UnlockModal isOpen={isUnlockModalOpen} onClose={() => setIsUnlockModalOpen(false)} onSubmit={handleUnlockMaster} />
+      
+      {/* NEW MANAGE STAFF MODAL */}
+      <ManageStaffModal 
+        isOpen={isManageStaffModalOpen
