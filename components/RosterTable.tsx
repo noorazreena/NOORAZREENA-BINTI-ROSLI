@@ -1,4 +1,4 @@
-
+// (OVERWRITE components/RosterTable.tsx)
 import React from 'react';
 import { StaffRoster, ShiftCode, DailyStrength, DayStatus } from '../types';
 import { DAYS_OF_WEEK, SHIFT_COLORS, PUBLIC_HOLIDAYS_2026 } from '../constants';
@@ -8,9 +8,11 @@ interface RosterTableProps {
   rosterData: StaffRoster[];
   dailyStrength: DailyStrength[];
   viewMode?: 'PLAN' | 'ACTUAL' | 'DAILY';
+  // DITAMBAH: Untuk klik dan buka modal edit
+  onCellClick?: (staffId: string, date: number, currentCode: ShiftCode) => void;
 }
 
-export const RosterTable: React.FC<RosterTableProps> = ({ rosterData, dailyStrength, viewMode = 'PLAN' }) => {
+export const RosterTable: React.FC<RosterTableProps> = ({ rosterData, dailyStrength, viewMode = 'PLAN', onCellClick }) => {
   if (!rosterData.length) return <div>No Data</div>;
 
   const headerDays = rosterData[0].days;
@@ -35,7 +37,7 @@ export const RosterTable: React.FC<RosterTableProps> = ({ rosterData, dailyStren
     return `Allowance: RM ${day.mealAllowance}`;
   };
 
-  const renderCell = (day: DayStatus) => {
+  const renderCell = (person: StaffRoster, day: DayStatus) => {
     let codeForColor = day.code;
     if (day.code === ShiftCode.CFPH && day.originalCode) {
       codeForColor = day.originalCode;
@@ -46,14 +48,15 @@ export const RosterTable: React.FC<RosterTableProps> = ({ rosterData, dailyStren
     
     const displayText = day.isRestDayOT ? 'RDOT' : day.code;
     const rdotClass = day.isRestDayOT ? 'font-black tracking-tighter' : '';
-    // Enhanced weekend visual: Darker, more saturated, and with an inner ring
     const weekendClass = isWeekendDay ? 'brightness-95 saturate-150 ring-inset ring-1 ring-black/10' : '';
-    const hoverClass = 'transition-all duration-150 hover:brightness-75 cursor-pointer hover:shadow-inner';
+    const hoverClass = 'transition-all duration-150 hover:brightness-75 cursor-pointer hover:shadow-inner hover:scale-105 transform origin-center z-10';
     
     return (
       <div 
         className={`w-full h-full flex items-center justify-center font-bold text-xs ${colorClass} ${rdotClass} ${weekendClass} ${hoverClass} relative group`}
-        title={isWeekendDay ? 'Weekend Duty' : ''}
+        title={isWeekendDay ? 'Weekend Duty (Click to Edit)' : 'Click to Edit'}
+        // INI PENTING: Panggil function bila ditekan
+        onClick={() => onCellClick && onCellClick(person.staff.id, day.date, day.code)}
       >
         {displayText}
         {isWeekendDay && (
@@ -64,14 +67,13 @@ export const RosterTable: React.FC<RosterTableProps> = ({ rosterData, dailyStren
   };
 
   return (
-    <div className="overflow-x-auto border border-black shadow-lg bg-white mb-8">
+    <div className="overflow-x-auto border border-black shadow-lg bg-white mb-8 select-none">
       <table className="w-full border-collapse min-w-[1500px]">
         <thead className="sticky top-0 z-20 bg-gray-100 text-[9px] uppercase text-center border-b-2 border-black leading-tight">
           <tr>
             <th className="sticky left-0 z-30 bg-gray-200 border border-black min-w-[30px] w-[30px] p-0.5 break-words whitespace-normal" rowSpan={2}>No<br/>Staf</th>
             <th className="sticky left-[30px] z-30 bg-gray-200 border border-black min-w-[40px] w-[40px] p-0.5 break-words whitespace-normal" rowSpan={2}>No<br/>Badan</th>
             <th className="sticky left-[70px] z-30 bg-gray-200 border border-black min-w-[35px] w-[35px] p-0.5 break-words whitespace-normal" rowSpan={2}>Pkt</th>
-            {/* Reduced width for Nama */}
             <th className="sticky left-[105px] z-30 bg-gray-200 border border-black min-w-[100px] max-w-[100px] p-1 text-center" rowSpan={2}>Nama</th>
             <th className="border border-black bg-gray-300 min-w-[30px] p-0.5 whitespace-normal" rowSpan={2}>DATE<br/>DAY</th>
             
@@ -119,7 +121,6 @@ export const RosterTable: React.FC<RosterTableProps> = ({ rosterData, dailyStren
         <tbody className="text-center text-xs">
           {rosterData.map((person) => (
             <React.Fragment key={person.staff.id}>
-              {/* Row 1: SHIFT */}
               <tr className="min-h-[32px]">
                 <td className="sticky left-0 z-10 bg-white border border-black font-semibold text-[10px]" rowSpan={3}>{person.staff.id}</td>
                 <td className="sticky left-[30px] z-10 bg-white border border-black text-[10px]" rowSpan={3}>{person.staff.bodyNumber}</td>
@@ -135,7 +136,7 @@ export const RosterTable: React.FC<RosterTableProps> = ({ rosterData, dailyStren
                   </div>
                 </td>
                 <td className="border border-black font-bold bg-gray-50 text-[10px]">SHIFT</td>
-                {person.days.map((day, i) => <td key={`status-${i}`} className="border border-black p-0">{renderCell(day)}</td>)}
+                {person.days.map((day, i) => <td key={`status-${i}`} className="border border-black p-0">{renderCell(person, day)}</td>)}
                 
                 {/* SUMMARY VALUES REORDERED - Spanning 3 rows */}
                 <td className="border border-black font-bold" rowSpan={3}>{person.summary.workdays}</td>
@@ -147,7 +148,6 @@ export const RosterTable: React.FC<RosterTableProps> = ({ rosterData, dailyStren
                 <td className="border border-black font-bold bg-green-100 text-green-800" rowSpan={3}>{person.summary.cfph}</td>
               </tr>
               
-              {/* Row 2: OT */}
               <tr className="h-6 bg-gray-50">
                 <td className="border border-black font-semibold text-[9px]">OT</td>
                 {person.days.map((day, i) => (
@@ -157,7 +157,6 @@ export const RosterTable: React.FC<RosterTableProps> = ({ rosterData, dailyStren
                 ))}
               </tr>
 
-              {/* Row 3: MEAL */}
               <tr className="h-6 bg-gray-50">
                 <td className="border border-black font-semibold text-[9px]">MEAL</td>
                 {person.days.map((day, i) => (
