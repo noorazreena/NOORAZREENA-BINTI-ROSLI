@@ -1,11 +1,9 @@
 // (SILA PADAM SEMUA KOD LAMA DALAM App.tsx DAN GANTI DENGAN KOD INI)
 import React, { useState, useMemo, useEffect } from 'react';
 import { Printer, Calendar, UserMinus, Clock, Ban, ArrowRightCircle, FileText, LayoutGrid, CheckCircle, ChevronLeft, ChevronRight, Download, BarChart2, Trash2, RefreshCcw, Edit3, Lock, Unlock, ShieldCheck, Users, CalendarDays } from 'lucide-react';
-
-// --- IMPORT COMPONENTS & LOGIC ---
 import { RosterTable } from './components/RosterTable';
 import { DailyRoster } from './components/DailyRoster';
-// PATH FIX: Import dari services/roster-generator.ts
+// PATH BETUL: Import dari services/
 import { generateRoster, calculateDailyStrength } from './services/roster-generator'; 
 import { MONTH_NAMES, SHIFT_COLORS, STAFF_LIST as DEFAULT_STAFF_LIST } from './constants';
 import { ShiftCode, RosterOverride, DailyDutyDetails, ApprovalRecord, Staff } from './types';
