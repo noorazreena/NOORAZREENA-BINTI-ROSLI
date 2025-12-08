@@ -1,5 +1,7 @@
-import { PUBLIC_HOLIDAYS_2026 } from './constants';
-import { StaffRoster, ShiftCode, DayStatus, Staff, Rank, DailyStrength, RosterOverride } from './types';
+// (SILA PADAM DAN GANTI SEMUA KOD DALAM services/rosterGenerator.ts)
+
+import { PUBLIC_HOLIDAYS_2026 } from '../constants';
+import { StaffRoster, ShiftCode, DayStatus, Staff, Rank, DailyStrength, RosterOverride } from '../types';
 
 // Helper function for modulo that handles negative numbers correctly
 const mod = (n: number, m: number) => ((n % m) + m) % m;
@@ -25,7 +27,7 @@ export const generateRoster = (targetYear: number, targetMonth: number, override
 
   // Helper to determine if staff is restricted to Day Shift (and Fixed Rotation)
   const isFixedDayStaff = (staff: Staff) => 
-    staff.rank === Rank.SJN || staff.name.includes('NOORAZREENA'); // Updated based on rule
+    staff.rank === Rank.SJN || staff.name.includes('NOORAZREENA');
 
   // Calculate Quarterly Rotation Shift for Off Day stagger
   const monthsSinceBase = (targetYear - 2025) * 12 + targetMonth;
@@ -180,12 +182,11 @@ export const generateRoster = (targetYear: number, targetMonth: number, override
         }
         totalMealAllowance += currentDay.mealAllowance;
 
-      } else if (currentDay.code === ShiftCode.O) {
-        consecutiveWorkDays = 0;
-        restdays++;
       } else {
+        // Break streak
         consecutiveWorkDays = 0;
-        if (currentDay.code !== ShiftCode.CFPH) leave++;
+        if (currentDay.code === ShiftCode.O) restdays++;
+        else if (currentDay.code !== ShiftCode.CFPH) leave++;
       }
       
       if (isPH && currentDay.code !== ShiftCode.O && currentDay.code !== ShiftCode.CFPH) publicHolidays++;
@@ -200,10 +201,9 @@ export const generateRoster = (targetYear: number, targetMonth: number, override
 };
 
 export const calculateDailyStrength = (rosters: StaffRoster[]): DailyStrength[] => {
-  // Logic is simplified for clarity, assuming daily strength calculation is correct based on original logic
   if (rosters.length === 0) return [];
   const numDays = rosters[0].days.length;
-  const strength: DailyStrength[] = [];
+  const strength: any[] = [];
 
   for (let i = 0; i < numDays; i++) {
     let sCount = 0;
@@ -231,7 +231,6 @@ export const calculateDailyStrength = (rosters: StaffRoster[]): DailyStrength[] 
       off: oCount
     });
   }
-  // Note: DailyStrength interface in types.ts is now using properties (day, month, shiftSiang, shiftMalam, off)
   return strength.map(s => ({
     date: `${dateInfo.year}-${dateInfo.month + 1}-${s.day}`,
     shiftSiang: s.shiftSiang,
