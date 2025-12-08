@@ -433,4 +433,12 @@ function App() {
                    <button onClick={handlePrevDay} className="p-1 hover:bg-gray-600 rounded text-gray-300 hover:text-white" title="Previous Day"><ChevronLeft className="w-4 h-4" /></button>
                    <div className="flex items-center px-2">
                      <label className="text-xs font-bold text-gray-400 mr-2">DATE:</label>
-                     <input type="date" className="bg-gray-600 text-white border border-gray-500 rounded px-2 py-0.5 text-sm focus:outline-none focus:border-blue-400" value={selectedDailyDate.toISOString().split('T')[0]} onChange={handleDailyDateChange
+// Sila GANTI SEGMEN INI dalam App.tsx (sekitar baris 436)
+
+                   <input 
+                     type="date" 
+                     className="bg-gray-600 text-white border border-gray-500 rounded px-2 py-0.5 text-sm focus:outline-none focus:border-blue-400" 
+                     value={selectedDailyDate.toISOString().split('T')[0]} 
+                     onChange={handleDailyDateChange} // <-- PASTIKAN BRACKET INI LENGKAP
+                   /> 
+// END OF SEGMENT
