@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { StaffRoster, ShiftCode, Rank, DailyDutyDetails, Staff } from '../types';
 import { Edit, Save, X, Sparkles, Loader2, RefreshCw, UserPlus, List, CheckCircle, Unlock, FileSignature, Shuffle, AlignJustify } from 'lucide-react';
-// IMPORT PENTING UNTUK AI
-import { GoogleGenAI } from "@google/genai";
+
+// --- PEMBETULAN UTAMA DISINI 👇 ---
+// Kita tukar dari "@google/genai" ke "@google/generative-ai"
+import { GoogleGenerativeAI } from "@google/generative-ai"; 
+// ----------------------------------
+
 import { ApprovalModal } from './ApprovalModal';
 import { UnlockModal } from './UnlockModal';
 
@@ -240,7 +244,7 @@ export const DailyRoster: React.FC<DailyRosterProps> = ({ date, rosterData, deta
     setIsEditing(false);
   };
 
-  // --- AI GENERATION LOGIC (UPDATED FOR REACT) ---
+  // --- AI GENERATION LOGIC (FIXED) ---
   const handleGenerateAiNotes = async () => {
     const apiKey = import.meta.env.VITE_GOOGLE_API_KEY; 
     
@@ -251,8 +255,9 @@ export const DailyRoster: React.FC<DailyRosterProps> = ({ date, rosterData, deta
 
     setIsGenerating(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: apiKey });
-      const modelId = 'gemini-2.0-flash'; 
+      // FIX: Guna syntax untuk SDK baru
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
       
       const dateStr = formatDate(date);
       const dayName = dateStr.split(' ')[0];
@@ -260,12 +265,8 @@ export const DailyRoster: React.FC<DailyRosterProps> = ({ date, rosterData, deta
       
       const prompt = `Role: Sergeant, Polis Bantuan EcoWorld. Generate 4 concise daily briefing notes (Tugasan Khas) for ${dateStr} (${isWeekend ? 'Weekend' : 'Weekday'}). 1. Patrol, 2. Clubhouse, 3. Safety/Weather, 4. Equipment. Malay. Numbered.`;
       
-      const response = await ai.models.generateContent({ 
-          model: modelId, 
-          contents: [{ role: 'user', parts: [{ text: prompt }] }] 
-      });
-      
-      const text = response.response.text(); 
+      const result = await model.generateContent(prompt);
+      const text = result.response.text(); 
       
       if (text) {
         const lines = text.split('\n')
