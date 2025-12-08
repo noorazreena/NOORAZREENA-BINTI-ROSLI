@@ -1,288 +1,543 @@
-import React, { useState } from 'react';
-import { Calendar, Layout, FileText, Activity, Users, BarChart2, RefreshCcw, Briefcase, PlusCircle, AlertTriangle } from 'lucide-react';
-
-// --- IMPORT SEMUA KOMPONEN CANGGIH KAU ---
-import { RosterTable } from './components/RosterTable'; 
-import { DailyRoster } from './components/DailyRoster'; 
-import { ChangeShiftModal } from './components/ChangeShiftModal'; 
-import { StatsModal } from './components/StatsModal';
-import { SwapShiftModal } from './components/SwapShiftModal';
-import { RequestCFPHModal } from './components/RequestCFPHModal';
-import { RequestNoOTModal } from './components/RequestNoOTModal';
-import { RequestRDOTModal } from './components/RequestRDOTModal';
+// (SILA PADAM SEMUA KOD LAMA DALAM App.tsx DAN GANTI DENGAN INI)
+import React, { useState, useMemo, useEffect } from 'react';
+import { Printer, Calendar, UserMinus, Clock, Ban, ArrowRightCircle, FileText, LayoutGrid, CheckCircle, ChevronLeft, ChevronRight, Download, BarChart2, Trash2, RefreshCcw, Edit3, Lock, Unlock, ShieldCheck, Users, CalendarDays } from 'lucide-react';
+import { RosterTable } from './components/RosterTable';
+import { DailyRoster } from './components/DailyRoster';
+// FIX IMPORT: Mesti ada services/ folder
+import { generateRoster, calculateDailyStrength } from './roster-generator'; 
+import { MONTH_NAMES, SHIFT_COLORS, STAFF_LIST as DEFAULT_STAFF_LIST } from './constants';
+import { ShiftCode, RosterOverride, DailyDutyDetails, ApprovalRecord, Staff } from './types';
 import { LeaveRequestModal } from './components/LeaveRequestModal';
+import { RequestRDOTModal } from './components/RequestRDOTModal';
+import { RequestNoOTModal } from './components/RequestNoOTModal';
+import { RequestCFPHModal } from './components/RequestCFPHModal';
+import { SwapShiftModal } from './components/SwapShiftModal';
+import { ChangeShiftModal } from './components/ChangeShiftModal';
+import { StatsModal } from './components/StatsModal';
+import { ApprovalModal } from './components/ApprovalModal';
+import { UnlockModal } from './components/UnlockModal';
 import { ManageStaffModal } from './components/ManageStaffModal';
 import { PublicHolidaysModal } from './components/PublicHolidaysModal';
 
-import { StaffRoster, DailyDutyDetails, Staff, ShiftCode, Rank } from './types'; 
+function App() {
+  const today = new Date();
 
-// --- SENARAI 8 STAFF (DATA ASAL KAU) ---
-const INITIAL_STAFF: Staff[] = [
-  { id: '1', bodyNumber: '74722', rank: Rank.SJN, name: 'MOHD KHAIRUL AZWANDY', walkieTalkie: 'N01', vehicle: 'WXC 1234' },
-  { id: '2', bodyNumber: '94340', rank: Rank.KPL, name: 'KALAIARASU A/L MUNIANDY', walkieTalkie: 'N02', vehicle: 'WXC 2345' },
-  { id: '3', bodyNumber: '12345', rank: Rank.KONST, name: 'ALI BIN ABU', walkieTalkie: 'N03', vehicle: 'MPV 1' },
-  { id: '4', bodyNumber: '67890', rank: Rank.KONST, name: 'AHMAD ZAKI', walkieTalkie: 'N04', vehicle: 'MPV 2' },
-  { id: '5', bodyNumber: '11111', rank: Rank.KONST, name: 'SITI AMINAH', walkieTalkie: 'N05', vehicle: 'MPV 3' },
-  { id: '6', bodyNumber: '22222', rank: Rank.KONST, name: 'RAHMAT BIN SAID', walkieTalkie: 'N06', vehicle: 'WXC 8888' },
-  { id: '7', bodyNumber: '33333', rank: Rank.KONST, name: 'NOORAZREENA BINTI ROSLI', walkieTalkie: 'N07', vehicle: 'WXC 9999' },
-  { id: '8', bodyNumber: '44444', rank: Rank.KONST, name: 'MUHAMMAD HAFIZ', walkieTalkie: 'N08', vehicle: 'MPV 4' },
-];
+  // --- PERSISTENT UI STATE ---
+  const [currentYear, setCurrentYear] = useState(() => {
+    try {
+      const saved = localStorage.getItem('currentYear');
+      return saved ? parseInt(saved) : today.getFullYear();
+    } catch { return today.getFullYear(); }
+  });
 
-const generateSampleRoster = (staffList: Staff[]): StaffRoster[] => {
-  return staffList.map(staff => {
-    const days = [];
-    for (let i = 1; i <= 31; i++) {
-      let code = ShiftCode.S;
-      if (i % 6 === 0 || i % 6 === 5) code = ShiftCode.O;
-      else if (i % 6 === 3 || i % 6 === 4) code = ShiftCode.M;
-      
-      days.push({
-        date: i,
-        month: 11, // Disember
-        year: 2025,
-        dayOfWeek: new Date(2025, 11, i).getDay(),
-        code: code,
-        originalCode: code,
-        isRestDayOT: false,
-        otHours: 0,
-        mealAllowance: 10
-      });
-    }
-    return {
-      staff: staff,
-      days: days,
-      summary: { workdays: 22, restdays: 8, publicHolidays: 1, leave: 0, otHours: 0, meals: 220, rdot: 0, cfph: 0 },
-      conflicts: []
-    };
-  });
-};
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    try {
+      const saved = localStorage.getItem('currentMonth');
+      return saved ? parseInt(saved) : today.getMonth();
+    } catch { return today.getMonth(); }
+  });
+  
+  const [viewMode, setViewMode] = useState<'PLAN' | 'ACTUAL' | 'DAILY'>(() => {
+    try {
+      const saved = localStorage.getItem('viewMode');
+      return (saved === 'PLAN' || saved === 'ACTUAL' || saved === 'DAILY') ? saved : 'PLAN';
+    } catch { return 'PLAN'; }
+  });
 
-const SAMPLE_STRENGTH = Array.from({ length: 31 }, (_, i) => ({
-  date: `2025-12-${i + 1}`,
-  shiftSiang: 4,
-  shiftMalam: 3,
-  off: 1
-}));
+  const [selectedDailyDate, setSelectedDailyDate] = useState<Date>(today);
 
-export default function App() {
-  const [viewMode, setViewMode] = useState<'PLAN' | 'ACTUAL' | 'DAILY'>('PLAN');
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date(2025, 11, 1)); 
-  
-  // STATE DATA UTAMA
-  const [staffList, setStaffList] = useState<Staff[]>(INITIAL_STAFF);
-  const [rosterData, setRosterData] = useState<StaffRoster[]>(generateSampleRoster(INITIAL_STAFF));
-  const [dailyDetails, setDailyDetails] = useState<DailyDutyDetails | null>(null);
+  // --- PERSISTENT DATA STATE ---
+  const [overrides, setOverrides] = useState<RosterOverride[]>(() => {
+    try {
+      const saved = localStorage.getItem('rosterOverrides');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.error("Failed to load overrides:", e);
+      return [];
+    }
+  });
+  
+  const [dailyDutyLogs, setDailyDutyLogs] = useState<Record<string, DailyDutyDetails>>(() => {
+    try {
+      const saved = localStorage.getItem('dailyDutyLogs');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      console.error("Failed to load daily logs:", e);
+      return {};
+    }
+  });
 
-  // STATE UNTUK SEMUA MODAL (Sistem Canggih Kau)
-  const [isChangeShiftOpen, setChangeShiftOpen] = useState(false);
-  const [isStatsOpen, setStatsOpen] = useState(false);
-  const [isSwapOpen, setSwapOpen] = useState(false);
-  const [isCFPHOpen, setCFPHOpen] = useState(false);
-  const [isNoOTOpen, setNoOTOpen] = useState(false);
-  const [isRDOTOpen, setRDOTOpen] = useState(false);
-  const [isLeaveOpen, setLeaveOpen] = useState(false);
-  const [isManageStaffOpen, setManageStaffOpen] = useState(false);
-  const [isPublicHolidaysOpen, setPublicHolidaysOpen] = useState(false);
+  const [masterApproval, setMasterApproval] = useState<ApprovalRecord | null>(() => {
+    try {
+      const saved = localStorage.getItem(`masterApproval_${currentYear}_${currentMonth}`);
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
 
-  const [selectedCell, setSelectedCell] = useState<{staffId: string, date: string} | null>(null);
+  // NEW: Dynamic Staff List
+  const [staffList, setStaffList] = useState<Staff[]>(() => {
+    try {
+      const saved = localStorage.getItem('staffList');
+      return saved ? JSON.parse(saved) : DEFAULT_STAFF_LIST;
+    } catch {
+      return DEFAULT_STAFF_LIST;
+    }
+  });
 
-  // --- LOGIC HANDLERS ---
+  // Load correct master approval when month/year changes
+  useEffect(() => {
+    const key = `masterApproval_${currentYear}_${currentMonth}`;
+    const saved = localStorage.getItem(key);
+    setMasterApproval(saved ? JSON.parse(saved) : null);
+  }, [currentYear, currentMonth]);
 
-  // 1. Handle Klik Kotak Jadual (Direct Edit)
-  const handleCellClick = (staffId: string, dayDate: number, currentCode: ShiftCode) => {
-    const dateStr = `2025-12-${dayDate.toString().padStart(2, '0')}`;
-    setSelectedCell({ staffId, date: dateStr });
-    setChangeShiftOpen(true);
-  };
+  // Modals
+  const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+  const [isRDOTModalOpen, setIsRDOTModalOpen] = useState(false);
+  const [isNoOTModalOpen, setIsNoOTModalOpen] = useState(false);
+  const [isCFPHModalOpen, setIsCFPHModalOpen] = useState(false);
+  const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
+  const [isChangeShiftModalOpen, setIsChangeShiftModalOpen] = useState(false);
+  const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
+  const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
+  const [isUnlockModalOpen, setIsUnlockModalOpen] = useState(false);
+  const [isManageStaffModalOpen, setIsManageStaffModalOpen] = useState(false);
+  const [isHolidaysModalOpen, setIsHolidaysModalOpen] = useState(false); // NEW
 
-  // 2. Update Shift (Manual Change)
-  const handleShiftChange = (staffId: string, dateStr: string, newCode: ShiftCode) => {
-    const dayNum = parseInt(dateStr.split('-')[2]);
-    const updated = rosterData.map(p => {
-        if (p.staff.id !== staffId) return p;
-        const newDays = p.days.map(d => d.date === dayNum ? { ...d, code: newCode, originalCode: newCode } : d);
-        return { ...p, days: newDays };
-    });
-    setRosterData(updated);
-    setChangeShiftOpen(false);
-  };
+  // --- PERSISTENCE EFFECTS ---
+  useEffect(() => localStorage.setItem('currentYear', currentYear.toString()), [currentYear]);
+  useEffect(() => localStorage.setItem('currentMonth', currentMonth.toString()), [currentMonth]);
+  useEffect(() => localStorage.setItem('viewMode', viewMode), [viewMode]);
+  useEffect(() => localStorage.setItem('rosterOverrides', JSON.stringify(overrides)), [overrides]);
+  useEffect(() => localStorage.setItem('dailyDutyLogs', JSON.stringify(dailyDutyLogs)), [dailyDutyLogs]);
+  useEffect(() => localStorage.setItem('staffList', JSON.stringify(staffList)), [staffList]);
+  useEffect(() => {
+    const key = `masterApproval_${currentYear}_${currentMonth}`;
+    if (masterApproval) localStorage.setItem(key, JSON.stringify(masterApproval));
+    else localStorage.removeItem(key);
+  }, [masterApproval, currentYear, currentMonth]);
 
-  // 3. Update Staff List (Manage Staff Modal)
-  const handleStaffUpdate = (newStaffList: Staff[]) => {
-    setStaffList(newStaffList);
-    // Regenerate roster structure for new staff (keep existing data if possible, but for now reset to sample)
-    setRosterData(generateSampleRoster(newStaffList)); 
-    setManageStaffOpen(false);
-  };
+  // Handle Data Reset
+  const handleFactoryReset = () => {
+    if (window.confirm("⚠️ DANGER: This will delete ALL saved roster changes, leaves, and daily notes. This cannot be undone.\n\nAre you sure you want to reset the app?")) {
+      localStorage.clear();
+      window.location.reload();
+    }
+  };
 
-  // 4. Dummy Handlers untuk Modal Lain (Sebab logik sebenar kompleks, kita buat basic update)
-  const handleSwapSubmit = (staffA: string, staffB: string, date: string) => {
-      alert(`Swap request submitted for Staff ${staffA} and ${staffB} on ${date}`);
-      setSwapOpen(false);
-  };
+  // --- AUTO SYNC LOGIC ---
+  let rosterGenerationYear = currentYear;
+  let rosterGenerationMonth = currentMonth;
 
-  const handleCFPHSubmit = (staffId: string, date: string) => {
-      alert(`CFPH request submitted for Staff ${staffId} on ${date}`);
-      setCFPHOpen(false);
-  };
+  if (viewMode === 'DAILY') {
+    const d = selectedDailyDate.getDate();
+    const m = selectedDailyDate.getMonth();
+    const y = selectedDailyDate.getFullYear();
+    
+    // If date is 26th or later, it belongs to the NEXT month's payroll
+    if (d >= 26) {
+      if (m === 11) { 
+        rosterGenerationMonth = 0; 
+        rosterGenerationYear = y + 1; 
+      } else { 
+        rosterGenerationMonth = m + 1; 
+        rosterGenerationYear = y; 
+      }
+    } else {
+      // If date is 1st to 25th, it belongs to CURRENT month's payroll
+      rosterGenerationMonth = m;
+      rosterGenerationYear = y;
+    }
+  }
 
-  const handleNoOTSubmit = (staffId: string, date: string) => {
-      alert(`No OT request submitted for Staff ${staffId} on ${date}`);
-      setNoOTOpen(false);
-  };
+  const basePlan = useMemo(() => 
+    generateRoster(rosterGenerationYear, rosterGenerationMonth, [], staffList), 
+  [rosterGenerationYear, rosterGenerationMonth, staffList]);
 
-  const handleLeaveSubmit = (staffId: string, type: ShiftCode, start: string, end: string) => {
-      alert(`Leave (${type}) request submitted for Staff ${staffId} from ${start} to ${end}`);
-      setLeaveOpen(false);
-  };
+  const rosterData = useMemo(() => {
+    const activeOverrides = viewMode === 'PLAN' 
+      ? overrides.filter(o => o.category === 'PLANNED' || !o.category) 
+      : overrides;
+    return generateRoster(rosterGenerationYear, rosterGenerationMonth, activeOverrides, staffList);
+  }, [rosterGenerationYear, rosterGenerationMonth, overrides, viewMode, staffList]);
+  
+  const dailyStrength = useMemo(() => calculateDailyStrength(rosterData), [rosterData]);
 
-  // --- RENDER ---
-  const renderContent = () => {
-    switch (viewMode) {
-      case 'PLAN':
-      case 'ACTUAL':
-        return (
-          <div className="animate-fade-in p-4">
-            {/* ACTION BAR: Butang-butang Menu Canggih */}
-            <div className="bg-white p-3 rounded-lg shadow-sm border border-gray-200 mb-4 flex flex-wrap gap-2 items-center">
-                <span className="text-xs font-bold text-gray-500 uppercase mr-2">Quick Actions:</span>
-                
-                <button onClick={() => setStatsOpen(true)} className="flex items-center gap-1 px-3 py-1.5 bg-indigo-50 text-indigo-700 text-xs font-medium rounded hover:bg-indigo-100 transition-colors">
-                    <BarChart2 className="w-3.5 h-3.5" /> Stats & Fairness
-                </button>
-                
-                <button onClick={() => setManageStaffOpen(true)} className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-700 text-xs font-medium rounded hover:bg-blue-100 transition-colors">
-                    <Users className="w-3.5 h-3.5" /> Manage Staff
-                </button>
+  const handlePrint = () => { window.print(); };
 
-                <div className="h-6 w-px bg-gray-300 mx-1"></div>
+  const downloadCSV = () => {
+    const headers = ["Staff Name", "ID", "Rank", "Workdays", "Restdays", "OT Hours", "Meals (RM)"];
+    const rows = rosterData.map(r => [
+      r.staff.name,
+      r.staff.id,
+      r.staff.rank,
+      r.summary.workdays,
+      r.summary.restdays,
+      r.summary.overtimeHours,
+      r.summary.meals
+    ]);
 
-                <button onClick={() => setSwapOpen(true)} className="flex items-center gap-1 px-3 py-1.5 bg-purple-50 text-purple-700 text-xs font-medium rounded hover:bg-purple-100 transition-colors">
-                    <RefreshCcw className="w-3.5 h-3.5" /> Swap Shift
-                </button>
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+      
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `roster_export_${currentYear}_${currentMonth+1}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
-                <button onClick={() => setLeaveOpen(true)} className="flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-700 text-xs font-medium rounded hover:bg-red-100 transition-colors">
-                    <Briefcase className="w-3.5 h-3.5" /> Request Leave
-                </button>
+  const nextMonth = () => {
+    if (currentMonth === 11) { setCurrentMonth(0); setCurrentYear(y => y + 1); } 
+    else { setCurrentMonth(m => m + 1); }
+  };
 
-                <button onClick={() => setCFPHOpen(true)} className="flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 text-xs font-medium rounded hover:bg-green-100 transition-colors">
-                    <PlusCircle className="w-3.5 h-3.5" /> Request CFPH
-                </button>
+  const prevMonth = () => {
+    if (currentMonth === 0) { setCurrentMonth(11); setCurrentYear(y => y - 1); } 
+    else { setCurrentMonth(m => m - 1); }
+  };
 
-                <button onClick={() => setPublicHolidaysOpen(true)} className="flex items-center gap-1 px-3 py-1.5 bg-yellow-50 text-yellow-700 text-xs font-medium rounded hover:bg-yellow-100 transition-colors ml-auto">
-                    <Calendar className="w-3.5 h-3.5" /> Public Holidays
-                </button>
-            </div>
+  const yearOptions = useMemo(() => {
+    const years = [];
+    const startYear = today.getFullYear() - 2;
+    for (let i = 0; i < 8; i++) { years.push(startYear + i); }
+    return years;
+  }, []);
 
-            {/* JADUAL UTAMA */}
-            <div className={`border-l-4 p-4 mb-4 rounded shadow-sm ${viewMode === 'PLAN' ? 'bg-blue-50 border-blue-500' : 'bg-green-50 border-green-500'}`}>
-              <h2 className={`font-bold flex items-center gap-2 text-lg ${viewMode === 'PLAN' ? 'text-blue-900' : 'text-green-900'}`}>
-                {viewMode === 'PLAN' ? <Calendar className="w-5 h-5" /> : <Activity className="w-5 h-5" />} 
-                {viewMode === 'PLAN' ? 'MASTER ROSTER PLAN' : 'MASTER ACTUAL'} (DISEMBER 2025)
-              </h2>
-              <p className={`text-sm ${viewMode === 'PLAN' ? 'text-blue-700' : 'text-green-700'}`}>
-                 Klik pada kotak untuk edit shift. Gunakan menu di atas untuk fungsi advanced.
-              </p>
-            </div>
-            
-            <RosterTable 
-              rosterData={rosterData}
-              dailyStrength={SAMPLE_STRENGTH}
-              viewMode={viewMode}
-              onCellClick={handleCellClick}
-            />
-          </div>
-        );
+  const getPeriodString = () => {
+    const y = rosterGenerationYear;
+    const m = rosterGenerationMonth;
 
-      case 'DAILY':
-        return (
-          <div className="animate-fade-in p-4 flex flex-col items-center">
-            <div className="bg-purple-50 border-l-4 border-purple-500 p-4 mb-4 rounded shadow-sm w-full max-w-[210mm]">
-              <div className="flex justify-between items-center flex-wrap gap-4">
-                <div>
-                    <h2 className="font-bold text-purple-900 flex items-center gap-2 text-lg">
-                        <FileText className="w-5 h-5" /> JADUAL HARIAN (DAILY ROSTER)
-                    </h2>
-                    <p className="text-sm text-purple-700">Paparan detail tugasan harian untuk dicetak.</p>
-                </div>
-                <input 
-                    type="date" 
-                    className="border p-2 rounded shadow-sm focus:ring-2 focus:ring-purple-500 outline-none"
-                    value={selectedDate.toISOString().split('T')[0]}
-                    onChange={(e) => setSelectedDate(new Date(e.target.value))}
-                />
-              </div>
-            </div>
-            
-            <DailyRoster 
-              date={selectedDate}
-              rosterData={rosterData}
-              details={dailyDetails}
-              onDetailsUpdate={(newDetails) => setDailyDetails(newDetails)}
-              staffList={staffList} // Pass full staff list
-            />
-          </div>
-        );
-    }
-  };
+    const prevDate = new Date(y, m - 1, 26);
+    const currDate = new Date(y, m, 25);
+    const prevMonthName = MONTH_NAMES[prevDate.getMonth()];
+    const currMonthName = MONTH_NAMES[currDate.getMonth()];
+    
+    if (prevDate.getFullYear() !== currDate.getFullYear()) {
+      return `26 ${prevMonthName} ${prevDate.getFullYear()} - 25 ${currMonthName} ${currDate.getFullYear()}`;
+    }
+    return `26 ${prevMonthName} - 25 ${currMonthName} ${currDate.getFullYear()}`;
+  };
 
-  return (
-    <div className="min-h-screen bg-gray-100 font-sans text-gray-900 flex flex-col">
-      {/* HEADER NAV */}
-      <div className="bg-white shadow-md p-4 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-            <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-                📅 SISTEM PENGURUSAN ROSTER
-            </h1>
-            <div className="flex rounded-lg shadow-sm bg-gray-100 p-1 overflow-hidden border border-gray-200">
-                <button onClick={() => setViewMode('PLAN')} className={`px-4 py-2 text-sm font-bold flex items-center gap-2 rounded-md transition-all ${viewMode === 'PLAN' ? 'bg-blue-600 text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}><Calendar className="w-4 h-4" /> PLAN</button>
-                <button onClick={() => setViewMode('ACTUAL')} className={`px-4 py-2 text-sm font-bold flex items-center gap-2 rounded-md transition-all ${viewMode === 'ACTUAL' ? 'bg-green-600 text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}><Activity className="w-4 h-4" /> ACTUAL</button>
-                <button onClick={() => setViewMode('DAILY')} className={`px-4 py-2 text-sm font-bold flex items-center gap-2 rounded-md transition-all ${viewMode === 'DAILY' ? 'bg-purple-600 text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}><FileText className="w-4 h-4" /> DAILY</button>
-            </div>
-        </div>
-      </div>
+  // ... handler functions remain largely the same ...
+  const handleApproveMaster = (name: string, rank: string) => {
+    setMasterApproval({
+      approverName: name,
+      approverRank: rank,
+      date: new Date().toLocaleDateString(),
+      isApproved: true
+    });
+  };
 
-      <div className="flex-1 overflow-auto">
-         {renderContent()}
-      </div>
+  const handleUnlockMaster = () => {
+    setMasterApproval(null);
+  };
 
-      {/* --- SEMUA MODALS KAU ADA SINI --- */}
-      {/* 1. Change Shift (Bila klik jadual) */}
-      {isChangeShiftOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-                <ChangeShiftModal 
-                    isOpen={isChangeShiftOpen}
-                    onClose={() => setChangeShiftOpen(false)}
-                    onSubmit={handleShiftChange}
-                    staffList={staffList}
-                />
-            </div>
-        </div>
-      )}
+  const handleNoOTSubmit = (staffId: string, dateStr: string) => {
+    const d = new Date(dateStr);
+    const category = viewMode === 'ACTUAL' ? 'UNPLANNED' : 'PLANNED';
+    setOverrides(prev => [...prev, { staffId, day: d.getDate(), month: d.getMonth(), year: d.getFullYear(), type: 'NO_OT', category }]);
+  };
 
-      {/* 2. Stats Modal */}
-      <StatsModal isOpen={isStatsOpen} onClose={() => setStatsOpen(false)} rosterData={rosterData} />
+  const handleCFPHSubmit = (staffId: string, dateStr: string) => {
+    const d = new Date(dateStr);
+    setOverrides(prev => [...prev, { staffId, day: d.getDate(), month: d.getMonth(), year: d.getFullYear(), type: 'LEAVE', leaveType: ShiftCode.CFPH, category: 'PLANNED' }]);
+  };
 
-      {/* 3. Manage Staff Modal */}
-      <ManageStaffModal isOpen={isManageStaffOpen} onClose={() => setManageStaffOpen(false)} staffList={staffList} onUpdate={handleStaffUpdate} />
+  const handleLeaveSubmit = (staffId: string, leaveType: ShiftCode, startDate: string, endDate: string) => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    let category: 'PLANNED' | 'UNPLANNED' = 'PLANNED';
+    if (viewMode === 'ACTUAL' || leaveType === ShiftCode.EL || leaveType === ShiftCode.CL) {
+      category = 'UNPLANNED';
+    }
+    const newOverrides: RosterOverride[] = [];
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      newOverrides.push({ staffId, year: d.getFullYear(), month: d.getMonth(), day: d.getDate(), type: 'LEAVE', leaveType, category });
+    }
+    setOverrides(prev => [...prev, ...newOverrides]);
+  };
 
-      {/* 4. Swap Shift Modal */}
-      <SwapShiftModal isOpen={isSwapOpen} onClose={() => setSwapOpen(false)} onSubmit={handleSwapSubmit} staffList={staffList} />
+  const handleSwapSubmit = (staffAId: string, staffBId: string, dateStr: string) => {
+    const d = new Date(dateStr);
+    const day = d.getDate();
+    const month = d.getMonth();
+    const year = d.getFullYear();
+    const staffARoster = basePlan.find(r => r.staff.id === staffAId);
+    const staffBRoster = basePlan.find(r => r.staff.id === staffBId);
+    const staffADay = staffARoster?.days.find(d => d.date === day && d.month === month && d.year === year);
+    const staffBDay = staffBRoster?.days.find(d => d.date === day && d.month === month && d.year === year);
 
-      {/* 5. CFPH Modal */}
-      <RequestCFPHModal isOpen={isCFPHOpen} onClose={() => setCFPHOpen(false)} onSubmit={handleCFPHSubmit} staffList={staffList} />
+    if (!staffADay || !staffBDay) { alert("Error: Could not determine original shifts for swap."); return; }
 
-      {/* 6. Leave Modal */}
-      <LeaveRequestModal isOpen={isLeaveOpen} onClose={() => setLeaveOpen(false)} onSubmit={handleLeaveSubmit} staffList={staffList} />
+    const newOverrides: RosterOverride[] = [
+      { staffId: staffAId, year, month, day, type: 'LEAVE', leaveType: staffBDay.code, category: 'UNPLANNED' },
+      { staffId: staffBId, year, month, day, type: 'LEAVE', leaveType: staffADay.code, category: 'UNPLANNED' }
+    ];
+    setOverrides(prev => [...prev, ...newOverrides]);
+  };
 
-      {/* 7. Public Holidays */}
-      <PublicHolidaysModal isOpen={isPublicHolidaysOpen} onClose={() => setPublicHolidaysOpen(false)} />
+  const handleChangeShiftSubmit = (staffId: string, dateStr: string, newCode: ShiftCode) => {
+    const d = new Date(dateStr);
+    const category = viewMode === 'ACTUAL' ? 'UNPLANNED' : 'PLANNED';
+    setOverrides(prev => [...prev, {
+      staffId, year: d.getFullYear(), month: d.getMonth(), day: d.getDate(), type: 'LEAVE', leaveType: newCode, category
+    }]);
+  };
 
-      {/* 8. No OT & RDOT (Boleh tambah butang kalau perlu, modal dah standby) */}
-      <RequestNoOTModal isOpen={isNoOTOpen} onClose={() => setNoOTOpen(false)} onSubmit={handleNoOTSubmit} staffList={staffList} />
-      <RequestRDOTModal isOpen={isRDOTOpen} onClose={() => setRDOTOpen(false)} staffList={staffList} />
+  const handleDailyDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const date = new Date(e.target.value);
+    if (!isNaN(date.getTime())) setSelectedDailyDate(date);
+  };
 
-    </div>
-  );
+  const handlePrevDay = () => {
+    const newDate = new Date(selectedDailyDate);
+    newDate.setDate(selectedDailyDate.getDate() - 1);
+    setSelectedDailyDate(newDate);
+  };
+
+  const handleNextDay = () => {
+    const newDate = new Date(selectedDailyDate);
+    newDate.setDate(selectedDailyDate.getDate() + 1);
+    setSelectedDailyDate(newDate);
+  };
+
+  const handleDailyDetailsUpdate = (details: DailyDutyDetails) => {
+    const key = selectedDailyDate.toISOString().split('T')[0];
+    setDailyDutyLogs(prev => ({ ...prev, [key]: details }));
+  };
+
+  const currentDailyDetails = dailyDutyLogs[selectedDailyDate.toISOString().split('T')[0]] || null;
+  const isMasterLocked = masterApproval?.isApproved && viewMode !== 'DAILY';
+
+  const totalDaysInPeriod = useMemo(() => {
+    if (!rosterData.length) return 0;
+    return rosterData[0].days.length;
+  }, [rosterData]);
+
+  // NEW: Update Staff Handler
+  const handleStaffUpdate = (newStaffList: Staff[]) => {
+    setStaffList(newStaffList);
+    setIsManageStaffModalOpen(false);
+  };
+
+  return (
+    <div className="min-h-screen p-4 md:p-8 font-sans bg-gray-100">
+      
+      {viewMode !== 'DAILY' && (
+      <div className="bg-white p-6 shadow-md mb-6 border-t-8 border-blue-900 relative">
+        {masterApproval && masterApproval.isApproved ? (
+           <div className="absolute top-0 right-0 bg-green-100 text-green-800 px-4 py-1 rounded-bl-lg border-l border-b border-green-300 flex items-center gap-2 text-xs font-bold no-print">
+              <ShieldCheck className="w-4 h-4" /> APPROVED BY {masterApproval.approverName} ON {masterApproval.date}
+           </div>
+        ) : (
+           <div className="absolute top-0 right-0 bg-gray-200 text-gray-500 px-4 py-1 rounded-bl-lg border-l border-b border-gray-300 text-xs font-bold no-print">
+              DRAFT MODE
+           </div>
+        )}
+
+        {/* ... Header section (Logo etc) ... */}
+        <div className="flex flex-col md:flex-row justify-between items-center mb-6 mt-4">
+          <div className="flex items-center space-x-4 mb-4 md:mb-0">
+            <div className="w-28 h-32 flex items-center justify-center">
+              <img src="https://file-service.aistudio.google.com/file/332f3ce9-756d-49d7-832d-327c5ce82d5f" alt="Logo" className="w-full h-full object-contain drop-shadow-md" />
+            </div>
+            <div className="text-center md:text-left">
+              <h1 className="text-2xl font-bold text-gray-900 tracking-wide">POLIS BANTUAN</h1>
+              <h2 className="text-lg text-green-700 font-serif italic font-bold">EcoWorld</h2>
+              <p className="text-xs text-gray-500 uppercase tracking-widest">Auxiliary Police • EcoNorth</p>
+            </div>
+          </div>
+          <div className="text-center">
+            <div className="bg-black text-white px-8 py-2 text-xl font-bold uppercase tracking-widest mb-1">MEMO</div>
+            <div className="text-sm font-semibold border-b border-black pb-1 mb-1">MASTER ROSTER</div>
+            <div className={`text-xs font-bold uppercase ${viewMode === 'ACTUAL' ? 'text-red-600' : 'text-gray-600'}`}>
+              {getPeriodString()} ({viewMode})
+            </div>
+            <div className="text-[10px] text-gray-500 mt-1">Total: {totalDaysInPeriod} Days</div>
+          </div>
+          <div className="text-right text-xs text-gray-500 hidden md:block">
+             <p>LAMPIRAN</p>
+             <p>EW/EN/PB ROS/BUL {currentMonth + 1}/{currentYear}</p>
+             <p>MS 1/1</p>
+          </div>
+        </div>
+
+        <div className="no-print flex flex-wrap gap-4 justify-between items-center bg-gray-50 p-4 rounded-lg border border-gray-200">
+          <div className="flex items-center gap-1 bg-white p-1 rounded border border-gray-300 shadow-sm">
+            <button onClick={prevMonth} className="px-2 py-1 hover:bg-gray-100 rounded text-gray-600 font-bold">&larr;</button>
+            <select value={currentMonth} onChange={(e) => setCurrentMonth(parseInt(e.target.value))} className="p-1 text-sm font-bold text-gray-800 bg-transparent outline-none cursor-pointer hover:bg-gray-50 rounded">
+              {MONTH_NAMES.map((name, index) => <option key={index} value={index}>{name}</option>)}
+            </select>
+            <select value={currentYear} onChange={(e) => setCurrentYear(parseInt(e.target.value))} className="p-1 text-sm font-bold text-gray-800 bg-transparent outline-none cursor-pointer hover:bg-gray-50 rounded">
+              {yearOptions.map(year => <option key={year} value={year}>{year}</option>)}
+            </select>
+            <button onClick={nextMonth} className="px-2 py-1 hover:bg-gray-100 rounded text-gray-600 font-bold">&rarr;</button>
+          </div>
+          
+          <div className="flex space-x-3 items-center">
+             {!isMasterLocked ? (
+               <>
+                 {/* NEW MANAGE STAFF BUTTON */}
+                 <button onClick={() => setIsManageStaffModalOpen(true)} className="flex items-center space-x-2 bg-indigo-600 text-white px-3 py-2 rounded shadow hover:bg-indigo-700 transition-colors text-xs"><Users className="w-4 h-4" /><span>Staff</span></button>
+                 
+                 {/* NEW HOLIDAYS BUTTON */}
+                 <button onClick={() => setIsHolidaysModalOpen(true)} className="flex items-center space-x-2 bg-white border border-gray-400 text-gray-700 px-3 py-2 rounded shadow hover:bg-gray-50 transition-colors text-xs"><CalendarDays className="w-4 h-4" /><span>Holidays</span></button>
+
+                 <div className="w-px h-8 bg-gray-300 mx-1"></div>
+
+                 <button onClick={() => setIsChangeShiftModalOpen(true)} className="flex items-center space-x-2 bg-white border border-blue-300 text-blue-700 px-3 py-2 rounded shadow hover:bg-blue-50 transition-colors text-xs"><Edit3 className="w-4 h-4" /><span>Change Shift</span></button>
+                 <button onClick={() => setIsSwapModalOpen(true)} className="flex items-center space-x-2 bg-white border border-purple-300 text-purple-700 px-3 py-2 rounded shadow hover:bg-purple-50 transition-colors text-xs"><RefreshCcw className="w-4 h-4" /><span>Swap Shift</span></button>
+                 <button onClick={() => setIsRDOTModalOpen(true)} className="flex items-center space-x-2 bg-white border border-orange-300 text-orange-700 px-3 py-2 rounded shadow hover:bg-orange-50 transition-colors text-xs"><Clock className="w-4 h-4" /><span>Req RDOT</span></button>
+                 <button onClick={() => setIsCFPHModalOpen(true)} className="flex items-center space-x-2 bg-white border border-green-300 text-green-700 px-3 py-2 rounded shadow hover:bg-green-50 transition-colors text-xs"><ArrowRightCircle className="w-4 h-4" /><span>Req CFPH</span></button>
+                 <button onClick={() => setIsNoOTModalOpen(true)} className="flex items-center space-x-2 bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded shadow hover:bg-gray-50 transition-colors text-xs"><Ban className="w-4 h-4" /><span>Req No OT</span></button>
+                 <button onClick={() => setIsLeaveModalOpen(true)} className="flex items-center space-x-2 bg-white border border-red-300 text-red-700 px-3 py-2 rounded shadow hover:bg-red-50 transition-colors text-xs"><UserMinus className="w-4 h-4" /><span>Req Leave</span></button>
+                 
+                 <div className="w-px h-8 bg-gray-300 mx-2"></div>
+                 
+                 <button onClick={() => setIsApprovalModalOpen(true)} className="flex items-center space-x-2 bg-green-700 text-white px-3 py-2 rounded shadow hover:bg-green-800 transition-colors text-xs font-bold animate-pulse"><CheckCircle className="w-4 h-4" /><span>Approve</span></button>
+               </>
+             ) : (
+                <div className="flex items-center gap-3">
+                   <div className="flex items-center gap-1 text-green-700 bg-green-100 px-3 py-2 rounded border border-green-200 text-xs font-bold">
+                      <Lock className="w-3 h-3" /> ROSTER LOCKED
+                   </div>
+                   <button onClick={() => setIsUnlockModalOpen(true)} className="flex items-center space-x-2 bg-red-600 text-white px-3 py-2 rounded shadow hover:bg-red-700 transition-colors text-xs font-bold"><Unlock className="w-4 h-4" /><span>Unlock</span></button>
+                </div>
+             )}
+          </div>
+        </div>
+      </div>
+      )}
+
+      {/* VIEW SWITCHER */}
+      <div className="no-print bg-gray-800 text-white p-3 rounded-lg mb-6 flex flex-wrap gap-4 justify-between items-center shadow-lg sticky top-0 z-50">
+          <div className="flex space-x-2 md:space-x-4">
+             <button onClick={() => setViewMode('PLAN')} className={`flex items-center space-x-2 px-3 py-2 rounded transition-colors text-xs md:text-sm ${viewMode === 'PLAN' ? 'bg-blue-600 font-bold shadow-inner' : 'hover:bg-gray-700'}`}><LayoutGrid className="w-4 h-4" /><span>Master Plan</span></button>
+             <button onClick={() => setViewMode('ACTUAL')} className={`flex items-center space-x-2 px-3 py-2 rounded transition-colors text-xs md:text-sm ${viewMode === 'ACTUAL' ? 'bg-green-600 font-bold shadow-inner' : 'hover:bg-gray-700'}`}><CheckCircle className="w-4 h-4" /><span>Master Actual</span></button>
+             <button onClick={() => setViewMode('DAILY')} className={`flex items-center space-x-2 px-3 py-2 rounded transition-colors text-xs md:text-sm ${viewMode === 'DAILY' ? 'bg-indigo-600 font-bold shadow-inner' : 'hover:bg-gray-700'}`}><FileText className="w-4 h-4" /><span>Daily Roster</span></button>
+          </div>
+          <div className="flex items-center space-x-4">
+             {viewMode === 'DAILY' ? (
+                <div className="flex items-center space-x-2 bg-gray-700 px-2 py-1 rounded border border-gray-600">
+                   <button onClick={handlePrevDay} className="p-1 hover:bg-gray-600 rounded text-gray-300 hover:text-white" title="Previous Day"><ChevronLeft className="w-4 h-4" /></button>
+                   <div className="flex items-center px-2">
+                     <label className="text-xs font-bold text-gray-400 mr-2">DATE:</label>
+                     <input type="date" className="bg-gray-600 text-white border border-gray-500 rounded px-2 py-0.5 text-sm focus:outline-none focus:border-blue-400" value={selectedDailyDate.toISOString().split('T')[0]} onChange={handleDailyDateChange} />
+                   </div>
+                   <button onClick={handleNextDay} className="p-1 hover:bg-gray-600 rounded text-gray-300 hover:text-white" title="Next Day"><ChevronRight className="w-4 h-4" /></button>
+                </div>
+             ) : (
+               <>
+                <button onClick={() => setIsStatsModalOpen(true)} className="flex items-center space-x-2 bg-purple-600 text-white px-3 py-2 rounded shadow hover:bg-purple-500 transition-colors font-bold text-xs"><BarChart2 className="w-4 h-4" /><span>STATS</span></button>
+                <button onClick={downloadCSV} className="flex items-center space-x-2 bg-green-600 text-white px-3 py-2 rounded shadow hover:bg-green-500 transition-colors font-bold text-xs"><Download className="w-4 h-4" /><span>CSV</span></button>
+               </>
+             )}
+             <button onClick={handlePrint} className="flex items-center space-x-2 bg-white text-gray-900 px-4 py-2 rounded shadow hover:bg-gray-100 transition-colors font-bold text-xs"><Printer className="w-4 h-4" /><span>PRINT</span></button>
+          </div>
+      </div>
+
+      {viewMode !== 'DAILY' ? (
+        <>
+          <RosterTable rosterData={rosterData} dailyStrength={dailyStrength} viewMode={viewMode} onCellClick={handleChangeShiftSubmit}/>
+          {/* ... Footer Legend etc ... */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-4 border border-black text-xs mt-8 relative">
+            {/* Approval Stamp */}
+            {masterApproval && masterApproval.isApproved && (
+                <div className="absolute right-10 bottom-10 z-10 opacity-90 transform -rotate-6">
+                    <div className="border-4 border-green-600 px-3 py-2 text-center bg-white/90 shadow-md min-w-[180px]">
+                        <div className="text-green-900 font-bold text-[9px] uppercase leading-tight">POLIS BANTUAN WILAYAH UTARA</div>
+                        <div className="text-green-900 font-bold text-[9px] uppercase leading-tight border-b-2 border-green-600 pb-1 mb-1">ECO WORLD DEVELOPMENT GROUP BHD.</div>
+                        <div className="text-green-700 font-black text-sm tracking-widest uppercase mb-1">DISAHKAN</div>
+                        <div className="text-green-800 text-[10px] font-bold uppercase">{masterApproval.approverName}</div>
+                        <div className="text-green-800 text-[9px] font-bold uppercase">{masterApproval.approverRank}</div>
+                        <div className="text-green-800 text-[8px] font-bold uppercase leading-tight mt-1">KETUA PENYELIA OPERASI DAN PENTADBIRAN</div>
+                        <div className="text-green-800 text-[9px] font-bold mt-1 border-t border-green-600 pt-1">TARIKH: {masterApproval.date}</div>
+                    </div>
+                </div>
+            )}
+            
+            {/* ... Legends ... */}
+            <div>
+                <h3 className="font-bold underline mb-2">SYMBOL LEGEND</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex items-center"><span className={`w-6 h-6 border flex items-center justify-center mr-2 font-bold ${SHIFT_COLORS[ShiftCode.S]}`}>S</span> Shift Siang (Day)</div>
+                  <div className="flex items-center"><span className={`w-6 h-6 border flex items-center justify-center mr-2 font-bold ${SHIFT_COLORS[ShiftCode.M]}`}>M</span> Shift Malam (Night)</div>
+                  <div className="flex items-center"><span className={`w-6 h-6 border flex items-center justify-center mr-2 font-bold ${SHIFT_COLORS[ShiftCode.O]}`}>O</span> Off Day</div>
+                  <div className="flex items-center"><span className={`w-6 h-6 border flex items-center justify-center mr-2 font-bold ${SHIFT_COLORS[ShiftCode.RDOT]}`}>RDOT</span> Rest Day OT (Request Only)</div>
+                  <div className="flex items-center"><span className={`w-6 h-6 border flex items-center justify-center mr-2 font-bold ${SHIFT_COLORS[ShiftCode.PH]}`}>PH</span> Public Holiday</div>
+                  <div className="flex items-center"><span className={`w-6 h-6 border flex items-center justify-center mr-2 font-bold ${SHIFT_COLORS[ShiftCode.CFPH]}`}>CFPH</span> Carry Forward PH</div>
+                  <div className="flex items-center"><span className={`w-6 h-6 border flex items-center justify-center mr-2 font-bold ${SHIFT_COLORS[ShiftCode.AL]}`}>AL</span> Annual Leave</div>
+                  <div className="flex items-center"><span className="w-6 h-6 border border-gray-300 flex items-center justify-center mr-2 font-bold bg-white">4</span> Overtime Hours</div>
+                </div>
+            </div>
+            <div>
+                <h3 className="font-bold underline mb-2">MANPOWER RULES</h3>
+                <ul className="list-disc pl-4 space-y-1 text-gray-600">
+                  <li>Period: 26th (Prev Month) to 25th (Curr Month).</li>
+                  <li>Min 3 Staff for Shift Siang (S).</li>
+                  <li>Min 3 Staff for Shift Malam (M).</li>
+                  <li><b>Fixed 4 Off Days</b> per Cycle.</li>
+                  <li>SJN & NOORAZREENA: Fixed Day Shift (S).</li>
+                  <li>KPL & Others: Rotate Weekly (6 S / 1 O / 6 M / 1 O).</li>
+                  <li><b>Rotation Shift:</b> Off Day moves to next day every 3 months (except SJN/Noorazreena).</li>
+                  <li>Senior Rank (SJN/KPL) required per day.</li>
+                  <li>RDOT assigned <b>only on request</b>.</li>
+                  <li>No OT = No Meal Allowance (&lt;10 hours duty).</li>
+                </ul>
+            </div>
+          </div>
+        </>
+      ) : (
+        <DailyRoster 
+          date={selectedDailyDate} 
+          rosterData={rosterData} 
+          details={currentDailyDetails} 
+          onDetailsUpdate={handleDailyDetailsUpdate}
+          staffList={staffList} 
+        />
+      )}
+
+      {/* FOOTER CONTROLS */}
+      <div className="no-print mt-12 border-t border-gray-300 pt-6 text-center">
+        <button 
+          onClick={handleFactoryReset}
+          className="text-red-600 hover:text-red-800 text-xs flex items-center justify-center gap-2 mx-auto"
+        >
+          <Trash2 className="w-3 h-3" /> Reset App Data
+        </button>
+        <p className="text-gray-400 text-[10px] mt-2">
+          This app uses local storage. Data is saved to this browser only.
+        </p>
+      </div>
+
+      <LeaveRequestModal isOpen={isLeaveModalOpen} onClose={() => setIsLeaveModalOpen(false)} onSubmit={handleLeaveSubmit} staffList={staffList} />
+      <RequestRDOTModal isOpen={isRDOTModalOpen} onClose={() => setIsRDOTModalOpen(false)} staffList={staffList} />
+      <RequestNoOTModal isOpen={isNoOTModalOpen} onClose={() => setIsNoOTModalOpen(false)} onSubmit={handleNoOTSubmit} staffList={staffList} />
+      <RequestCFPHModal isOpen={isCFPHModalOpen} onClose={() => setIsCFPHModalOpen(false)} onSubmit={handleCFPHSubmit} staffList={staffList} />
+      <SwapShiftModal isOpen={isSwapModalOpen} onClose={() => setIsSwapModalOpen(false)} onSubmit={handleSwapSubmit} staffList={staffList} />
+      <ChangeShiftModal isOpen={isChangeShiftModalOpen} onClose={() => setIsChangeShiftModalOpen(false)} onSubmit={handleChangeShiftSubmit} staffList={staffList} />
+      <StatsModal isOpen={isStatsModalOpen} onClose={() => setIsStatsModalOpen(false)} rosterData={rosterData} />
+      <ApprovalModal isOpen={isApprovalModalOpen} onClose={() => setIsApprovalModalOpen(false)} onSubmit={handleApproveMaster} title="Approve Master Roster" />
+      <UnlockModal isOpen={isUnlockModalOpen} onClose={() => setIsUnlockModalOpen(false)} onSubmit={handleUnlockMaster} />
+      
+      {/* NEW MANAGE STAFF MODAL */}
+      <ManageStaffModal 
+        isOpen={isManageStaffModalOpen} 
+        onClose={() => setIsManageStaffModalOpen(false)} 
+        staffList={staffList} 
+        onUpdate={handleStaffUpdate} 
+      />
+
+      {/* NEW PUBLIC HOLIDAYS MODAL */}
+      <PublicHolidaysModal 
+        isOpen={isHolidaysModalOpen} 
+        onClose={() => setIsHolidaysModalOpen(false)} 
+      />
+    </div>
+  );
 }
+
+export default App;
