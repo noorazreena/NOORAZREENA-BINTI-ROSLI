@@ -2,10 +2,10 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Printer, Calendar, UserMinus, Clock, Ban, ArrowRightCircle, FileText, LayoutGrid, CheckCircle, ChevronLeft, ChevronRight, Download, BarChart2, Trash2, RefreshCcw, Edit3, Lock, Unlock, ShieldCheck, Users, CalendarDays } from 'lucide-react';
+
+// FIX SEMUA IMPORT UNTUK KOMPONEN & LOGIK DENGAN CURLEY BRACES {}
 import { RosterTable } from './components/RosterTable';
 import { DailyRoster } from './components/DailyRoster';
-
-// PATH BETUL: Import dari services/rosterGenerator.ts
 import { generateRoster, calculateDailyStrength } from './services/rosterGenerator'; 
 
 import { MONTH_NAMES, SHIFT_COLORS, STAFF_LIST as DEFAULT_STAFF_LIST } from './constants';
@@ -477,7 +477,6 @@ function App() {
                   <div className="flex items-center"><span className={`w-6 h-6 border flex items-center justify-center mr-2 font-bold ${SHIFT_COLORS[ShiftCode.RDOT]}`}>RDOT</span> Rest Day OT (Request Only)</div>
                   <div className="flex items-center"><span className={`w-6 h-6 border flex items-center justify-center mr-2 font-bold ${SHIFT_COLORS[ShiftCode.PH]}`}>PH</span> Public Holiday</div>
                   <div className="flex items-center"><span className={`w-6 h-6 border flex items-center justify-center mr-2 font-bold ${SHIFT_COLORS[ShiftCode.CFPH]}`}>CFPH</span> Carry Forward PH</div>
-                  <div className="flex items-center"><span className={`w-6 h-6 border flex items-center justify-center mr-2 font-bold ${SHIFT_COLORS[ShiftCode.AL]}`}>AL</span> Annual Leave</div>
                   <div className="flex items-center"><span className="w-6 h-6 border border-gray-300 flex items-center justify-center mr-2 font-bold bg-white">4</span> Overtime Hours</div>
                 </div>
             </div>
