@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { StaffRoster, ShiftCode, Rank, DailyDutyDetails, Staff } from '../types';
-import { Edit, Save, X, Sparkles, Loader2, RefreshCw, UserPlus, List, CheckCircle, Unlock, FileSignature, Shuffle, AlignJustify } from 'lucide-react';
-import { GoogleGenerativeAI } from "@google/generative-ai"; 
+import React, { useState, useEffect } from 'react';
+import { StaffRoster, DailyDutyDetails, Staff } from '../types';
+import { Edit, Save, X, RefreshCw, UserPlus, List, FileSignature, CheckCircle, Unlock, Shuffle } from 'lucide-react';
 import { ApprovalModal } from './ApprovalModal';
 import { UnlockModal } from './UnlockModal';
 
@@ -24,35 +23,56 @@ const DEFAULT_DETAILS: DailyDutyDetails = {
   ]
 };
 
-// PENTING: Guna "export const" supaya App.tsx boleh baca
+// --- INI YANG PENTING: export const ---
 export const DailyRoster: React.FC<DailyRosterProps> = ({ date, rosterData, details, onDetailsUpdate, staffList }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<DailyDutyDetails>(details || DEFAULT_DETAILS);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
   const [isPreparationModalOpen, setIsPreparationModalOpen] = useState(false);
   const [isUnlockModalOpen, setIsUnlockModalOpen] = useState(false);
-  const [customInputModes, setCustomInputModes] = useState<Record<string, boolean>>({});
-  
-  const [isRotationEnabled, setIsRotationEnabled] = useState(true);
 
-  // ... (Kod selebihnya sama, tapi saya ringkaskan untuk elak error copy-paste. 
-  // Kod ini cukup untuk paparkan UI) ...
-  
+  useEffect(() => {
+    if (details) setEditForm(details);
+  }, [details]);
+
+  const handleSave = () => {
+    onDetailsUpdate(editForm);
+    setIsEditing(false);
+  };
+
   return (
-    <div className="flex flex-col items-center bg-white p-4 border shadow-lg max-w-[210mm] mx-auto mt-4">
-        <h2 className="text-xl font-bold mb-4 underline">JADUAL TUGAS HARIAN (DAILY ROSTER)</h2>
-        <p className="mb-4 font-bold text-lg">{date.toDateString()}</p>
-        
-        <div className="bg-blue-50 p-4 border border-blue-200 rounded w-full text-center">
-            <p>Sistem Roster Berjaya Dimuatkan.</p>
-            <p className="text-sm text-gray-600 mt-2">Sila pastikan semua Staff (8 orang) dipaparkan dalam Master Plan dahulu.</p>
+    <div className="flex flex-col items-center bg-white p-6 border-2 border-black shadow-2xl max-w-[210mm] mx-auto min-h-[297mm]">
+      {/* HEADER */}
+      <div className="w-full flex justify-between items-center border-b-2 border-black pb-4 mb-4">
+        <div className="text-left">
+           <h1 className="font-bold text-xl">POLIS BANTUAN ECOWORLD</h1>
+           <p className="text-sm">JADUAL TUGASAN HARIAN</p>
         </div>
-        
-        {/* Placeholder butang edit */}
-        <div className="mt-4 flex gap-2">
-             <button onClick={() => alert("Fungsi Edit akan diaktifkan selepas Master Plan stabil")} className="bg-gray-300 px-4 py-2 rounded text-gray-600 cursor-not-allowed">Edit Details</button>
+        <div className="text-right">
+           <h2 className="font-bold text-lg">{date.toDateString().toUpperCase()}</h2>
         </div>
+      </div>
+
+      <div className="bg-blue-50 p-6 rounded-lg border border-blue-200 text-center w-full mb-6">
+        <h3 className="font-bold text-blue-800 text-lg mb-2">Mod Paparan Harian</h3>
+        <p className="text-gray-600 mb-4">Sila pastikan Master Plan telah dijana dengan lengkap sebelum mencetak jadual ini.</p>
+        
+        {!isEditing ? (
+           <button onClick={() => setIsEditing(true)} className="flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mx-auto">
+             <Edit className="w-4 h-4" /> Edit Butiran Harian
+           </button>
+        ) : (
+           <div className="flex gap-2 justify-center">
+             <button onClick={() => setIsEditing(false)} className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"><X className="w-4 h-4" /> Batal</button>
+             <button onClick={handleSave} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"><Save className="w-4 h-4" /> Simpan</button>
+           </div>
+        )}
+      </div>
+
+      {/* FOOTER */}
+      <div className="mt-auto w-full pt-4 border-t-2 border-black">
+         <p className="text-center text-xs font-bold">DICETAK OLEH SISTEM ROSTER ECOWORLD</p>
+      </div>
     </div>
   );
 };
