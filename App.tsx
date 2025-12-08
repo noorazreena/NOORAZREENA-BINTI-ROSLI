@@ -1,4 +1,4 @@
-// (SILA PADAM SEMUA KOD LAMA DALAM App.tsx DAN GANTI DENGAN KOD INI)
+// (INI ADALAH KOD App.tsx YANG LENGKAP DAN BETUL)
 import React, { useState, useMemo, useEffect } from 'react';
 import { Printer, Calendar, UserMinus, Clock, Ban, ArrowRightCircle, FileText, LayoutGrid, CheckCircle, ChevronLeft, ChevronRight, Download, BarChart2, Trash2, RefreshCcw, Edit3, Lock, Unlock, ShieldCheck, Users, CalendarDays } from 'lucide-react';
 import { RosterTable } from './components/RosterTable';
